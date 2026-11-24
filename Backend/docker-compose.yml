@@ -1,0 +1,16 @@
+services:
+  db:
+    image: postgres:17
+    container_name: learnspace-db
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: learnspace
+      POSTGRES_PASSWORD: learnspace_dev
+      POSTGRES_DB: learnspace
+    ports:
+      - "5433:5432"
+    volumes:
+      - learnspace-pgdata:/var/lib/postgresql/data
+
+volumes:
+  learnspace-pgdata:
