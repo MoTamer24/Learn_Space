@@ -1,4 +1,5 @@
 using System.Text.Json;
+using LearnSpace.Api.Common;
 using Microsoft.AspNetCore.Mvc;
 
 namespace LearnSpace.Api.Common.Errors;
@@ -13,11 +14,26 @@ public class ExceptionHandlingMiddleware(RequestDelegate next, ILogger<Exception
         }
         catch (AppException ex)
         {
+            var userId = context.User.TryGetUserId();
+            logger.LogWarning(
+                "AppException ({StatusCode}) at {Path} for user {UserId}: {Message}",
+                ex.StatusCode,
+                context.Request.Path,
+                userId?.ToString() ?? "Anonymous",
+                ex.Message);
+
             await WriteProblemAsync(context, ex.StatusCode, ex.Message);
         }
         catch (Exception ex)
         {
-            logger.LogError(ex, "Unhandled exception while processing {Method} {Path}", context.Request.Method, context.Request.Path);
+            var userId = context.User.TryGetUserId();
+            logger.LogError(
+                ex,
+                "Unhandled exception while processing {Method} {Path} for user {UserId}",
+                context.Request.Method,
+                context.Request.Path,
+                userId?.ToString() ?? "Anonymous");
+
             await WriteProblemAsync(context, 500, "An unexpected error occurred.");
         }
     }
