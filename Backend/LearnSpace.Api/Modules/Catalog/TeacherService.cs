@@ -10,6 +10,7 @@ namespace LearnSpace.Api.Modules.Catalog;
 public interface ITeacherService
 {
     Task CreateEmptyProfileAsync(Guid userId);
+    Task<bool> ExistsAsync(Guid userId);
 }
 
 public class TeacherService(
@@ -24,6 +25,8 @@ public class TeacherService(
         db.TeacherProfiles.Add(new TeacherProfile { UserId = userId });
         await db.SaveChangesAsync();
     }
+
+    public Task<bool> ExistsAsync(Guid userId) => db.TeacherProfiles.AnyAsync(p => p.UserId == userId);
 
     public async Task<List<TeacherDto>> ListAsync()
     {

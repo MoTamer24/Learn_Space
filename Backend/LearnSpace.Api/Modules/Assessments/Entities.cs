@@ -13,6 +13,8 @@ public class Quiz
     public int DurationMinutes { get; set; }
     public QuizStatus Status { get; set; } = QuizStatus.Draft;
     public List<Question> Questions { get; set; } = [];
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class Question
@@ -24,6 +26,8 @@ public class Question
     public int Points { get; set; }
     public int Position { get; set; }
     public List<QuestionOption> Options { get; set; } = [];
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class QuestionOption
@@ -32,6 +36,8 @@ public class QuestionOption
     public Guid QuestionId { get; set; }
     public string Text { get; set; } = "";
     public bool IsCorrect { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class QuizAttempt
@@ -45,6 +51,8 @@ public class QuizAttempt
     public AttemptStatus Status { get; set; } = AttemptStatus.InProgress;
     public decimal? Score { get; set; }
     public List<AttemptAnswer> Answers { get; set; } = [];
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class AttemptAnswer
@@ -56,6 +64,8 @@ public class AttemptAnswer
     public string? TextAnswer { get; set; }
     public decimal? AwardedPoints { get; set; }
     public string? TeacherNote { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 /// <summary>Named CourseTask to avoid clashing with System.Threading.Tasks.Task.</summary>
@@ -67,6 +77,8 @@ public class CourseTask
     public string Instructions { get; set; } = "";
     public DateTime DeadlineAt { get; set; }
     public decimal MaxScore { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }
 
 public class TaskSubmission
@@ -82,4 +94,6 @@ public class TaskSubmission
     public SubmissionStatus Status { get; set; } = SubmissionStatus.Submitted;
     public decimal? Score { get; set; }
     public string? TeacherNote { get; set; }
+    public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
+    public DateTime UpdatedAt { get; set; } = DateTime.UtcNow;
 }

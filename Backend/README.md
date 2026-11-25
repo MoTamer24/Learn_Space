@@ -1,6 +1,6 @@
 # LearnSpace Backend (MVP)
 
-Backend API for a Coursera-style learning platform: teachers publish courses with materials, a timed quiz and a homework task; students enroll, learn, take the quiz, submit the task and get graded.
+Backend API demo for individual tutors and students, with the original course-learning MVP retained alongside group tutoring, attendance, billing, assessments, and subscriptions.
 
 - .NET 10, ASP.NET Core Web API (controllers)
 - EF Core + PostgreSQL (Npgsql), ASP.NET Core Identity, JWT bearer
@@ -28,7 +28,7 @@ dotnet run
 
 Open **http://localhost:5080/swagger**.
 
-On startup in Development the app creates the schema, creates the `Student` and `Teacher` roles and loads the seed data. Uploaded files go to `LearnSpace.Api/storage/`.
+On startup in Development the app creates the schema, creates all five roles, and loads both the original course seed and the tutoring demo seed. Uploaded files go to `LearnSpace.Api/storage/`.
 
 > **Before real use:** replace `Jwt:Key` in `LearnSpace.Api/appsettings.json` (a long random string, at least 32 characters). The value in the repo is a development placeholder.
 
@@ -38,13 +38,30 @@ All seeded accounts use the password **`Dev@12345`**.
 
 | Role | Email | Notes |
 |---|---|---|
+| Admin | `admin@learnspace.dev` | demo administrator |
 | Teacher | `ahmed.teacher@learnspace.dev` | owns "Introduction to C# Programming" (Published) and "Advanced ASP.NET Core" (Draft) |
 | Teacher | `sara.teacher@learnspace.dev` | owns "Calculus I" (Published) |
-| Student | `student1@learnspace.dev` | not enrolled anywhere: use this one to test enrolling |
-| Student | `student2@learnspace.dev` | not enrolled anywhere |
-| Student | `student3@learnspace.dev` | already enrolled in the C# course |
+| Student | `student1@learnspace.dev` | enrolled in monthly and per-session groups; partial payment recorded |
+| Student | `student2@learnspace.dev` | enrollment is over its group debt limit; check-in is blocked |
+| Student | `student3@learnspace.dev` | fully exempt from group fees |
+| Parent | `parent1@learnspace.dev` | linked to students 1 and 2; receives check-in notifications |
+| Staff | `assistant@learnspace.dev` | belongs to Ahmed's teacher account |
 
 The C# course also has: 2 materials (placeholder files), a published quiz (2 MCQ + 1 written, 20 minutes), one task with a deadline 7 days ahead and one task whose deadline already passed.
+
+The tutoring demo adds Mathematics and Programming subject-levels, two study groups (monthly and per-session pricing), schedules and upcoming class sessions, a question bank and assessment, group materials, a subscription plan, and sample debt/payment balances.
+
+## Tutoring demo flow
+
+1. Log in at `POST /api/auth/login` as `ahmed.teacher@learnspace.dev` with `Dev@12345` and authorize Swagger with the returned access token.
+2. Use `GET /api/groups` and `GET /api/identity/students` to find the seeded group, student profile, and QR code value. Use the group's `sessions` route to get a session ID.
+3. Call `POST /api/groups/check-in` with `{ "studentId": "<student profile id>", "sessionId": "<session id>", "status": "Present" }`. Student 1 is allowed; Student 2 is blocked by the group's debt limit. The blocked check-in sends in-app notifications to the teacher and linked parent.
+4. Record a partial payment with `POST /api/payments`. Monthly groups require `billingMonth` in `YYYY-MM`; per-session groups require `sessionId`. The enrollment and student balances are updated through module contracts.
+5. Explore `/api/catalog`, `/api/assessments`, `/api/tutoring/materials`, `/api/notifications`, and `/api/subscriptions` in Swagger.
+
+All demo accounts use `Dev@12345`. Public registration can create Student and Teacher accounts; an Admin token is needed to create Admin, Parent, or Staff accounts or manage catalog reference data.
+
+The tutoring API routes are protected by JWT role checks. Each module queries its own entities; cross-module workflows use service interfaces. The shared `AppDbContext` follows the reference repository's modular-monolith convention.
 
 ## 4. Try it in Swagger (about 5 minutes)
 
@@ -83,6 +100,15 @@ All routes are under `/api`. "T" = Teacher, "S" = Student.
 | | `GET /courses/{id}/tasks` | owner or enrolled |
 | | `PUT /tasks/{id}/submission` (multipart `file`), `GET /tasks/{id}/submission/me` | S |
 | | `GET /submissions/{id}/file` | submitting student or T (owner) |
+| Identity | `/identity/users`, `/identity/students`, `/identity/parents`, `/identity/student-parents`, `/identity/staff` | signed in (user/staff creation: Admin) |
+| Catalog | `/catalog/subjects`, `/catalog/levels`, `/catalog/subject-levels` | reads public; writes Admin |
+| Groups | `/groups`, `/groups/{id}/schedules`, `/groups/{id}/sessions`, `/groups/{id}/enrollments`, `/groups/check-in` | T/Admin/Staff |
+| Attendance | `/attendance?sessionId=` | T/Admin/Staff |
+| Payments | `GET/POST /payments`, `DELETE /payments/{id}` | T/Admin/Staff |
+| Assessments | `/assessments`, `/assessments/questions`, `/assessments/{id}/questions`, `/assessments/{id}/submissions` | T/Admin/Student by operation |
+| Tutoring content | `GET/POST /tutoring/materials` | signed in (create: T/Admin) |
+| Notifications | `/notifications/teachers/{teacherId}`, `/notifications/recipients/{userId}` | signed in |
+| Subscriptions | `/subscriptions/plans`, `/subscriptions`, `/subscriptions/payments` | T/Admin |
 
 Errors are `ProblemDetails`: 400 invalid input, 401 not signed in, 403 not allowed, 404 not found, 409 rule violation.
 
@@ -113,7 +139,7 @@ dotnet ef migrations add InitialCreate -o Data/Migrations
 dotnet run                      # applies the migration, creates roles, seeds
 ```
 
-For anything other than Development, run `dotnet ef database update` yourself and create the `Student` and `Teacher` roles (the automatic migrate / roles / seed step is Development-only, as the spec says).
+For anything other than Development, run `dotnet ef database update` yourself and create the configured roles (automatic schema setup and demo seeding are Development-only).
 
 ## 8. Project structure
 
@@ -133,16 +159,18 @@ LearnSpace.Api/
     Migrations/     (empty until you run `dotnet ef migrations add`)
   Modules/
     Identity/       ApplicationUser, AuthController, TokenService, UserLookup
-    Catalog/        TeacherProfile, Course, TeachersController, CoursesController, CourseService, TeacherService
-    Enrollment/     Enrollment, EnrollmentController, EnrollmentService, CourseResultsService
+    Catalog/        TeacherProfile, Subject, Level, SubjectLevel, courses and catalog contracts
+    Enrollment/     legacy course enrollment module
+    Groups/         StudyGroup, GroupSchedule, GroupEnrollment, ClassSession
+    Attendance/     check-in and attendance records
+    Payments/       partial payments and enrollment balance refresh
     Content/        Material, MaterialsController, MaterialService
-    Assessments/    Quiz, Question, QuestionOption, QuizAttempt, AttemptAnswer, CourseTask, TaskSubmission,
-                    QuizzesController, TasksController, QuizService, CourseTaskService
+    Assessments/    course quizzes/tasks and tutoring question bank/assessments
+    Notifications/  teacher/parent in-app notifications
+    Subscriptions/  plans, teacher subscriptions and teacher payments
 ```
 
-Module rule: a module queries only its own entities. Cross-module calls go through small interfaces:
-`ICourseService` (ownership, status, course lookup), `IEnrollmentService` (enrolled / can view), `IUserLookup` (display names),
-`ITeacherService` (create the profile at registration), `IAssessmentSummaryService` (feeds the results table), `IStorageService`.
+Module rule: each module queries its own entities. Cross-module calls go through small interfaces such as `IGroupBillingService`, `IPaymentService`, `IStudentDebtService`, `INotificationService`, `ICatalogLookup`, and `ITeacherService`. The API uses one shared `AppDbContext`, matching the reference repository's modular-monolith convention.
 
 ## 9. Decisions and assumptions (where the spec was silent)
 
@@ -162,4 +190,4 @@ Module rule: a module queries only its own entities. Cross-module calls go throu
 
 ## 10. Out of scope (intentionally not built)
 
-Payments, expiry rules/whitelists, live sessions, SignalR/real-time, search beyond `subject`, admin role or teacher approval, refresh tokens, S3, DRM, quiz retakes, multiple files per submission, AI features, unit tests, a Docker image for the API.
+Real payment-gateway integration, live video sessions, SignalR/real-time delivery, production authorization policies and tenant isolation, refresh tokens, S3, DRM, quiz retakes, multiple files per submission, AI features, unit tests, and a Docker image for the API.

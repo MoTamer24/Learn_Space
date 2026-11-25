@@ -3,6 +3,7 @@ using LearnSpace.Api.Data;
 using LearnSpace.Api.Modules.Catalog;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.EntityFrameworkCore;
 
 namespace LearnSpace.Api.Modules.Identity;
 
@@ -17,8 +18,10 @@ public class AuthController(
     [HttpPost("register")]
     public async Task<ActionResult<RegisteredUserDto>> Register(RegisterRequest request)
     {
-        var role = AppRoles.All.FirstOrDefault(r => string.Equals(r, request.Role.Trim(), StringComparison.OrdinalIgnoreCase))
-            ?? throw AppException.BadRequest("Role must be 'Student' or 'Teacher'.");
+        var role = new[] { AppRoles.Student, AppRoles.Teacher }.FirstOrDefault(r => string.Equals(r, request.Role.Trim(), StringComparison.OrdinalIgnoreCase))
+            ?? throw AppException.BadRequest("Public registration is available for Student and Teacher accounts only.");
+        if (!string.IsNullOrWhiteSpace(request.Phone) && await users.Users.AnyAsync(x => x.PhoneNumber == request.Phone.Trim()))
+            throw AppException.BadRequest("Phone number is already in use.");
 
         // One transaction so a teacher never ends up without a profile row.
         await using var tx = await db.Database.BeginTransactionAsync();
@@ -27,7 +30,8 @@ public class AuthController(
         {
             UserName = request.Email.Trim(),
             Email = request.Email.Trim(),
-            DisplayName = request.DisplayName.Trim()
+            DisplayName = request.DisplayName.Trim(),
+            PhoneNumber = request.Phone?.Trim()
         };
 
         var created = await users.CreateAsync(user, request.Password);
@@ -50,7 +54,7 @@ public class AuthController(
     public async Task<ActionResult<LoginResponse>> Login(LoginRequest request)
     {
         var user = await users.FindByEmailAsync(request.Email.Trim());
-        if (user is null || !await users.CheckPasswordAsync(user, request.Password))
+        if (user is null || !user.IsActive || !await users.CheckPasswordAsync(user, request.Password))
             throw AppException.Unauthorized("Invalid email or password.");
 
         var role = (await users.GetRolesAsync(user)).FirstOrDefault() ?? "";

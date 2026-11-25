@@ -9,6 +9,11 @@ using LearnSpace.Api.Modules.Catalog;
 using LearnSpace.Api.Modules.Content;
 using LearnSpace.Api.Modules.Enrollments;
 using LearnSpace.Api.Modules.Identity;
+using LearnSpace.Api.Modules.Groups;
+using LearnSpace.Api.Modules.Attendance;
+using LearnSpace.Api.Modules.Payments;
+using LearnSpace.Api.Modules.Notifications;
+using LearnSpace.Api.Modules.Subscriptions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
@@ -123,12 +128,27 @@ builder.Services.AddSingleton<UploadValidator>();
 // Identity
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IUserLookup, UserLookup>();
+builder.Services.AddScoped<IdentityService>();
+builder.Services.AddScoped<IStudentDebtService>(sp => sp.GetRequiredService<IdentityService>());
+builder.Services.AddScoped<IStaffDirectory>(sp => sp.GetRequiredService<IdentityService>());
 
 // Catalog
 builder.Services.AddScoped<CourseService>();
 builder.Services.AddScoped<ICourseService>(sp => sp.GetRequiredService<CourseService>());
 builder.Services.AddScoped<TeacherService>();
 builder.Services.AddScoped<ITeacherService>(sp => sp.GetRequiredService<TeacherService>());
+builder.Services.AddScoped<SubjectService>();
+builder.Services.AddScoped<ICatalogLookup>(sp => sp.GetRequiredService<SubjectService>());
+
+// Groups, payments, attendance, and notifications coordinate through module contracts.
+builder.Services.AddScoped<GroupService>();
+builder.Services.AddScoped<IGroupBillingService>(sp => sp.GetRequiredService<GroupService>());
+builder.Services.AddScoped<PaymentService>();
+builder.Services.AddScoped<IPaymentService>(sp => sp.GetRequiredService<PaymentService>());
+builder.Services.AddScoped<AttendanceService>();
+builder.Services.AddScoped<NotificationService>();
+builder.Services.AddScoped<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
+builder.Services.AddScoped<TutoringAssessmentService>();
 
 // Enrollment
 builder.Services.AddScoped<EnrollmentService>();
@@ -171,6 +191,7 @@ if (app.Environment.IsDevelopment())
     }
 
     await services.GetRequiredService<DbSeeder>().SeedAsync();
+    await services.GetRequiredService<DbSeeder>().SeedTutoringAsync();
 }
 
 // ---------------------------------------------------------------------
