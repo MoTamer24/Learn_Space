@@ -6,7 +6,8 @@ public record RegisterRequest(
     [property: Required, EmailAddress, StringLength(256)] string Email,
     [property: Required, MinLength(8), StringLength(100)] string Password,
     [property: Required, StringLength(100)] string DisplayName,
-    [property: Required] string Role);
+    [property: Required] string Role,
+    [property: Phone] string? Phone = null);
 
 public record LoginRequest(
     [property: Required] string Email,
