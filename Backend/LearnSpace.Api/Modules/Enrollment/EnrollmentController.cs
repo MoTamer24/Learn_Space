@@ -23,7 +23,7 @@ public class EnrollmentController(EnrollmentService enrollments, CourseResultsSe
     public async Task<ActionResult<List<MyEnrollmentDto>>> Mine()
         => await enrollments.GetMineAsync(User.GetUserId());
 
-    /// <summary>The teacher's results table: one row per enrolled student.</summary>
+    /// <summary>The teacher's list of enrolled students.</summary>
     [HttpGet("courses/{courseId:guid}/students")]
     [Authorize(Roles = AppRoles.Teacher)]
     public async Task<ActionResult<List<StudentResultRowDto>>> Students(Guid courseId)

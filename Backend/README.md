@@ -1,5 +1,7 @@
 # LearnSpace Backend (MVP)
 
+> **Scope note:** payments, attendance, exams/assessments, materials, notifications and subscriptions were removed from this branch. Only Groups and Students (plus Identity, Catalog and Enrollment) remain. Sections below that still describe the removed features (seed accounts, walkthroughs, project structure, decisions) are out of date.
+
 Backend API demo for individual tutors and students, with the original course-learning MVP retained alongside group tutoring, attendance, billing, assessments, and subscriptions.
 
 - .NET 10, ASP.NET Core Web API (controllers)
@@ -89,26 +91,10 @@ All routes are under `/api`. "T" = Teacher, "S" = Student.
 | Courses | `GET /courses?subject=`, `GET /courses/{id}` | public (Draft: owner only) |
 | | `POST /courses`, `PUT /courses/{id}`, `POST /courses/{id}/publish` | T (owner) |
 | Enrollment | `POST /courses/{id}/enroll`, `GET /enrollments/me` | S |
-| | `GET /courses/{id}/students` (results table) | T (owner) |
-| Materials | `POST /courses/{id}/materials` (multipart: title, type, file) | T (owner) |
-| | `GET /courses/{id}/materials`, `GET /materials/{id}/content` (range support) | owner or enrolled |
-| Quizzes | `POST /courses/{id}/quizzes`, `POST /quizzes/{id}/publish`, `GET /quizzes/{id}/attempts`, `POST /attempts/{id}/grade` | T (owner) |
-| | `GET /courses/{id}/quizzes` | owner or enrolled |
-| | `POST /quizzes/{id}/attempts`, `PUT /attempts/{id}/answers`, `POST /attempts/{id}/submit` | S |
-| | `GET /attempts/{id}` | S (own) or T (owner) |
-| Tasks | `POST /courses/{id}/tasks`, `GET /tasks/{id}/submissions`, `POST /submissions/{id}/grade` | T (owner) |
-| | `GET /courses/{id}/tasks` | owner or enrolled |
-| | `PUT /tasks/{id}/submission` (multipart `file`), `GET /tasks/{id}/submission/me` | S |
-| | `GET /submissions/{id}/file` | submitting student or T (owner) |
+| | `GET /courses/{id}/students` (student list) | T (owner) |
 | Identity | `/identity/users`, `/identity/students`, `/identity/parents`, `/identity/student-parents`, `/identity/staff` | signed in (user/staff creation: Admin) |
 | Catalog | `/catalog/subjects`, `/catalog/levels`, `/catalog/subject-levels` | reads public; writes Admin |
-| Groups | `/groups`, `/groups/{id}/schedules`, `/groups/{id}/sessions`, `/groups/{id}/enrollments`, `/groups/check-in` | T/Admin/Staff |
-| Attendance | `/attendance?sessionId=` | T/Admin/Staff |
-| Payments | `GET/POST /payments`, `DELETE /payments/{id}` | T/Admin/Staff |
-| Assessments | `/assessments`, `/assessments/questions`, `/assessments/{id}/questions`, `/assessments/{id}/submissions` | T/Admin/Student by operation |
-| Tutoring content | `GET/POST /tutoring/materials` | signed in (create: T/Admin) |
-| Notifications | `/notifications/teachers/{teacherId}`, `/notifications/recipients/{userId}` | signed in |
-| Subscriptions | `/subscriptions/plans`, `/subscriptions`, `/subscriptions/payments` | T/Admin |
+| Groups | `/groups`, `/groups/{id}/schedules`, `/groups/{id}/sessions`, `/groups/{id}/enrollments` | T/Admin/Staff |
 
 Errors are `ProblemDetails`: 400 invalid input, 401 not signed in, 403 not allowed, 404 not found, 409 rule violation.
 
@@ -119,7 +105,7 @@ Errors are `ProblemDetails`: 400 invalid input, 401 not signed in, 403 not allow
 | `ConnectionStrings:Default` | PostgreSQL connection (matches `docker-compose.yml`) |
 | `Jwt:Key`, `Jwt:Issuer`, `Jwt:Audience` | token signing (lifetime is 60 minutes) |
 | `Storage:RootPath` | where files are stored (relative paths are inside the API project folder) |
-| `Storage:Uploads:*` | allowed extensions and max size (MB) per kind: Video, Document, TaskFile, Logo |
+| `Storage:Uploads:*` | allowed extensions and max size (MB) per kind: Logo |
 | `Cors:AllowedOrigin` | the frontend origin, default `http://localhost:3000` |
 
 ## 7. Database migrations

@@ -9,7 +9,7 @@ using LearnSpace.Api.Modules.Groups;
 namespace LearnSpace.Api.Modules.Identity;
 
 [ApiController, Route("api/identity"), Authorize]
-public class IdentityController(AppDbContext db, IdentityService service, UserManager<ApplicationUser> users, ITeacherService teachers, IGroupBillingService groups) : ControllerBase
+public class IdentityController(AppDbContext db, IdentityService service, UserManager<ApplicationUser> users, ITeacherService teachers, IGroupDirectory groups) : ControllerBase
 {
     [HttpGet("users"), Authorize(Roles = AppRoles.Admin)]
     public async Task<IActionResult> Users(CancellationToken ct) => Ok(await db.Users.AsNoTracking().Select(x => new { x.Id, x.DisplayName, x.Email, x.PhoneNumber, x.IsActive }).ToListAsync(ct));
@@ -38,16 +38,6 @@ public class IdentityController(AppDbContext db, IdentityService service, UserMa
     {
         try { return CreatedAtAction(nameof(Students), await service.CreateStudentAsync(request, ct)); }
         catch (Exception e) when (e is InvalidOperationException or KeyNotFoundException) { return BadRequest(new { error = e.Message }); }
-    }
-
-    [HttpPatch("students/{id:guid}"), Authorize(Roles = AppRoles.Admin)]
-    public async Task<IActionResult> SetStudentDebtLimit(Guid id, UpdateStudentRequest request, CancellationToken ct)
-    {
-        var student = await db.Students.SingleOrDefaultAsync(x => x.Id == id && !x.IsDeleted, ct);
-        if (student is null) return NotFound();
-        if (request.MaxDebt < 0) return BadRequest(new { error = "MaxDebt cannot be negative." });
-        student.MaxDebt = request.MaxDebt; student.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(ct); return Ok(student);
     }
 
     [HttpDelete("students/{id:guid}"), Authorize(Roles = AppRoles.Admin)]

@@ -6,12 +6,5 @@ public record EnrollmentDto(Guid Id, Guid CourseId, Guid StudentId, DateTime Enr
 
 public record MyEnrollmentDto(Guid EnrollmentId, DateTime EnrolledAt, CourseDto Course);
 
-/// <summary>One row of the teacher's results table.</summary>
-public record StudentResultRowDto(
-    Guid StudentId,
-    string DisplayName,
-    string QuizStatus,      // NotStarted | InProgress | PendingGrading | Graded
-    decimal? QuizScore,
-    string TaskStatus,      // NotSubmitted | Submitted | Graded
-    bool? TaskIsLate,
-    decimal? TaskScore);
+/// <summary>One row of the teacher's student list.</summary>
+public record StudentResultRowDto(Guid StudentId, string DisplayName);

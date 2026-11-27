@@ -1,22 +1,14 @@
-using System.Text;
-using LearnSpace.Api.Common.Storage;
-using LearnSpace.Api.Modules.Assessments;
 using LearnSpace.Api.Modules.Catalog;
-using LearnSpace.Api.Modules.Content;
 using LearnSpace.Api.Modules.Enrollments;
 using LearnSpace.Api.Modules.Identity;
 using LearnSpace.Api.Modules.Groups;
-using LearnSpace.Api.Modules.Attendance;
-using LearnSpace.Api.Modules.Payments;
-using LearnSpace.Api.Modules.Notifications;
-using LearnSpace.Api.Modules.Subscriptions;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace LearnSpace.Api.Data.Seed;
 
 /// <summary>Development-only demo data. Runs once: it does nothing if any user already exists.</summary>
-public class DbSeeder(AppDbContext db, UserManager<ApplicationUser> users, IStorageService storage)
+public class DbSeeder(AppDbContext db, UserManager<ApplicationUser> users)
 {
     /// <summary>The same password for every seeded account (documented in the README).</summary>
     public const string DevPassword = "Dev@12345";
@@ -77,83 +69,6 @@ public class DbSeeder(AppDbContext db, UserManager<ApplicationUser> users, IStor
         // ---------- one pre-made enrollment (student3 in the C# course) ----------
         db.Enrollments.Add(new Enrollment { CourseId = csharp.Id, StudentId = student3.Id, EnrolledAt = DateTime.UtcNow });
 
-        // ---------- materials with tiny placeholder files ----------
-        db.Materials.AddRange(
-            new Material
-            {
-                CourseId = csharp.Id, Title = "Welcome video", Type = MaterialType.Video, Position = 1,
-                StorageKey = await SavePlaceholderAsync("welcome.mp4", "placeholder video bytes"),
-                FileName = "welcome.mp4", ContentType = "video/mp4"
-            },
-            new Material
-            {
-                CourseId = csharp.Id, Title = "Course syllabus", Type = MaterialType.Document, Position = 2,
-                StorageKey = await SavePlaceholderAsync("syllabus.pdf", "placeholder pdf bytes"),
-                FileName = "syllabus.pdf", ContentType = "application/pdf"
-            },
-            new Material
-            {
-                CourseId = calculus.Id, Title = "Limits cheat sheet", Type = MaterialType.Document, Position = 1,
-                StorageKey = await SavePlaceholderAsync("limits.pdf", "placeholder pdf bytes"),
-                FileName = "limits.pdf", ContentType = "application/pdf"
-            });
-
-        // ---------- one published quiz: 2 MCQ + 1 written ----------
-        db.Quizzes.Add(new Quiz
-        {
-            CourseId = csharp.Id,
-            Title = "C# Basics Quiz",
-            DurationMinutes = 20,
-            Status = QuizStatus.Published,
-            Questions =
-            [
-                new Question
-                {
-                    Type = QuestionType.Mcq, Text = "Which keyword declares a compile-time constant?", Points = 2, Position = 1,
-                    Options =
-                    [
-                        new QuestionOption { Text = "const", IsCorrect = true },
-                        new QuestionOption { Text = "static" },
-                        new QuestionOption { Text = "readonly" },
-                        new QuestionOption { Text = "final" }
-                    ]
-                },
-                new Question
-                {
-                    Type = QuestionType.Mcq, Text = "What is the default value of an int field?", Points = 2, Position = 2,
-                    Options =
-                    [
-                        new QuestionOption { Text = "0", IsCorrect = true },
-                        new QuestionOption { Text = "null" },
-                        new QuestionOption { Text = "-1" }
-                    ]
-                },
-                new Question
-                {
-                    Type = QuestionType.Written, Text = "In your own words, explain the difference between a class and an object.", Points = 6, Position = 3
-                }
-            ]
-        });
-
-        // ---------- two tasks: one still open, one whose deadline already passed ----------
-        db.CourseTasks.AddRange(
-            new CourseTask
-            {
-                CourseId = csharp.Id,
-                Title = "Build a console calculator",
-                Instructions = "Write a small console calculator in C# and upload your project as a PDF report.",
-                DeadlineAt = DateTime.UtcNow.AddDays(7),
-                MaxScore = 20
-            },
-            new CourseTask
-            {
-                CourseId = csharp.Id,
-                Title = "Hello World exercise (closed)",
-                Instructions = "Print Hello World and explain each line. The deadline has already passed.",
-                DeadlineAt = DateTime.UtcNow.AddDays(-2),
-                MaxScore = 10
-            });
-
         await db.SaveChangesAsync();
     }
 
@@ -171,9 +86,9 @@ public class DbSeeder(AppDbContext db, UserManager<ApplicationUser> users, IStor
         var staffUser = await EnsureUserAsync("assistant@learnspace.dev", "Yara Assistant", AppRoles.Staff);
         _ = await EnsureUserAsync("admin@learnspace.dev", "Demo Admin", AppRoles.Admin);
 
-        var s1 = new Student { UserId = student1.Id, Code = "STU-1001", MaxDebt = 1000 };
-        var s2 = new Student { UserId = student2.Id, Code = "STU-1002", MaxDebt = 1500 };
-        var s3 = new Student { UserId = student3.Id, Code = "STU-1003", MaxDebt = 800 };
+        var s1 = new Student { UserId = student1.Id, Code = "STU-1001" };
+        var s2 = new Student { UserId = student2.Id, Code = "STU-1002" };
+        var s3 = new Student { UserId = student3.Id, Code = "STU-1003" };
         db.Students.AddRange(s1, s2, s3);
         var parent = new Parent { UserId = parentUser.Id };
         db.Parents.Add(parent);
@@ -200,15 +115,12 @@ public class DbSeeder(AppDbContext db, UserManager<ApplicationUser> users, IStor
         await db.SaveChangesAsync();
 
         var today = DateOnly.FromDateTime(DateTime.UtcNow);
-        var currentMonth = today.ToString("yyyy-MM");
-        var monthlyEnrollment = new GroupEnrollment { StudentId = s1.Id, GroupId = monthly.Id, StartDate = today, OutstandingBalance = 200, MaxDebt = 500 };
-        var overLimitEnrollment = new GroupEnrollment { StudentId = s2.Id, GroupId = monthly.Id, StartDate = today, OutstandingBalance = 500, MaxDebt = 400 };
-        var exemptEnrollment = new GroupEnrollment { StudentId = s3.Id, GroupId = monthly.Id, StartDate = today, ExemptionType = ExemptionType.Full, ExemptionReason = "Scholarship", OutstandingBalance = 0 };
-        var sessionEnrollment = new GroupEnrollment { StudentId = s1.Id, GroupId = perSession.Id, StartDate = today, OutstandingBalance = 300, MaxDebt = 600 };
-        db.GroupEnrollments.AddRange(monthlyEnrollment, overLimitEnrollment, exemptEnrollment, sessionEnrollment);
+        var firstEnrollment = new GroupEnrollment { StudentId = s1.Id, GroupId = monthly.Id, StartDate = today };
+        var secondEnrollment = new GroupEnrollment { StudentId = s2.Id, GroupId = monthly.Id, StartDate = today };
+        var thirdEnrollment = new GroupEnrollment { StudentId = s3.Id, GroupId = monthly.Id, StartDate = today };
+        var fourthEnrollment = new GroupEnrollment { StudentId = s1.Id, GroupId = perSession.Id, StartDate = today };
+        db.GroupEnrollments.AddRange(firstEnrollment, secondEnrollment, thirdEnrollment, fourthEnrollment);
         await db.SaveChangesAsync();
-        db.Students.Where(x => x.Id == s1.Id).ExecuteUpdate(x => x.SetProperty(p => p.OutstandingBalance, 500m));
-        db.Students.Where(x => x.Id == s2.Id).ExecuteUpdate(x => x.SetProperty(p => p.OutstandingBalance, 500m));
 
         var sessionDate = today.AddDays((7 + (int)DayOfWeek.Wednesday - (int)today.DayOfWeek) % 7);
         var monthlySession = new ClassSession { GroupId = monthly.Id, Date = sessionDate, StartTime = new TimeOnly(17, 0), DurationMin = 90 };
@@ -217,25 +129,6 @@ public class DbSeeder(AppDbContext db, UserManager<ApplicationUser> users, IStor
         db.GroupSchedules.AddRange(
             new GroupSchedule { GroupId = monthly.Id, DayOfWeek = DayOfWeek.Wednesday, StartTime = new TimeOnly(17, 0), EndTime = new TimeOnly(18, 30) },
             new GroupSchedule { GroupId = perSession.Id, DayOfWeek = DayOfWeek.Wednesday, StartTime = new TimeOnly(19, 0), EndTime = new TimeOnly(20, 15) });
-        db.Payments.Add(new Payment { GroupEnrollmentId = monthlyEnrollment.Id, AmountPaid = 300, BillingMonth = currentMonth, Method = PaymentMethod.VodafoneCash });
-        await db.SaveChangesAsync();
-
-        var assessment = new Assessment { TeacherId = teacher1.Id, GroupId = monthly.Id, SessionId = monthlySession.Id, Title = "C# basics check", Type = AssessmentType.Quiz, Date = sessionDate.ToDateTime(new TimeOnly(17, 0)), Duration = 20, TotalMarks = 10 };
-        var bankQuestion = new QuestionBankItem { TeacherId = teacher1.Id, SubjectLevelId = programmingLevel.Id, QuestionText = "Which keyword declares a compile-time constant in C#?", Type = TutoringQuestionType.MCQ };
-        db.TutoringAssessments.Add(assessment);
-        db.QuestionBankItems.Add(bankQuestion);
-        db.QuestionBankOptions.AddRange(
-            new QuestionBankOption { QuestionId = bankQuestion.Id, OptionText = "const", IsCorrect = true },
-            new QuestionBankOption { QuestionId = bankQuestion.Id, OptionText = "readonly" });
-        db.AssessmentQuestions.Add(new AssessmentQuestion { AssessmentId = assessment.Id, QuestionId = bankQuestion.Id, QuestionOrder = 1, Mark = 10 });
-        db.TutoringMaterials.Add(new TutoringMaterial { TeacherId = teacher1.Id, GroupId = monthly.Id, SessionId = monthlySession.Id, Title = "Variables and types notes", Type = TutoringMaterialType.Notes, Url = "https://example.com/csharp-notes", SizeMB = 0.2m });
-        var plan = new Plan { Name = "Solo Teacher", Price = 299, MaxStudents = 100, MaxGroups = 10, MaxStorageMB = 2048 };
-        db.Plans.Add(plan);
-        await db.SaveChangesAsync();
-        var subscription = new TeacherSubscription { TeacherId = teacher1.Id, PlanId = plan.Id, StartDate = today, EndDate = today.AddMonths(1), Status = SubscriptionStatus.Active, StorageUsedMB = 0.2m };
-        db.TeacherSubscriptions.Add(subscription);
-        db.Notifications.Add(new Notification { TeacherId = teacher1.Id, UserId = parentUser.Id, Type = NotificationType.Session, Message = "Welcome to the C# Foundations group." });
-        db.TeacherPayments.Add(new TeacherPayment { TeacherSubscriptionId = subscription.Id, BillingMonth = currentMonth, Amount = plan.Price, Status = TeacherPaymentStatus.Paid });
         await db.SaveChangesAsync();
     }
 
@@ -263,11 +156,5 @@ public class DbSeeder(AppDbContext db, UserManager<ApplicationUser> users, IStor
             throw new InvalidOperationException($"Seeding role for {email} failed: " + string.Join(" ", inRole.Errors.Select(e => e.Description)));
 
         return user;
-    }
-
-    private async Task<string> SavePlaceholderAsync(string fileName, string text)
-    {
-        using var stream = new MemoryStream(Encoding.UTF8.GetBytes(text));
-        return await storage.SaveAsync(stream, fileName);
     }
 }

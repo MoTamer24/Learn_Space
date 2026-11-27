@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LearnSpace.Api.Modules.Groups;
 
-public class GroupService(AppDbContext db, ITeacherService teachers, ICatalogLookup catalog, IStudentDebtService students) : IGroupBillingService
+public class GroupService(AppDbContext db, ITeacherService teachers, ICatalogLookup catalog, IStudentDirectory students) : IGroupDirectory
 {
     public Task<List<StudyGroup>> GetGroupsAsync(Guid? teacherId = null, CancellationToken ct = default)
     { var query = db.StudyGroups.AsNoTracking(); if (teacherId.HasValue) query = query.Where(x => x.TeacherId == teacherId); return query.OrderBy(x => x.Name).ToListAsync(ct); }
@@ -22,17 +22,12 @@ public class GroupService(AppDbContext db, ITeacherService teachers, ICatalogLoo
     public async Task<GroupEnrollment> EnrollAsync(Guid groupId, CreateEnrollmentRequest request, CancellationToken ct = default)
     {
         var group = await db.StudyGroups.SingleOrDefaultAsync(x => x.Id == groupId, ct) ?? throw new KeyNotFoundException("Group not found.");
-        if (await students.GetDebtSnapshotAsync(request.StudentId, ct) is null) throw new InvalidOperationException("Student not found.");
-        if (request.Discount < 0 || request.MaxDebt < 0 || (request.ExemptionType == ExemptionType.Full && request.Discount > 0)) throw new InvalidOperationException("Invalid discount or debt limit.");
-        if (request.ExemptionType == ExemptionType.Full && string.IsNullOrWhiteSpace(request.ExemptionReason)) throw new InvalidOperationException("A reason is required for full exemption.");
+        if (!await students.StudentExistsAsync(request.StudentId, ct)) throw new InvalidOperationException("Student not found.");
         if (await db.GroupEnrollments.AnyAsync(x => x.GroupId == groupId && x.StudentId == request.StudentId && x.Status == EnrollmentStatus.Active, ct)) throw new InvalidOperationException("Student is already actively enrolled.");
         var count = await db.GroupEnrollments.CountAsync(x => x.GroupId == groupId && x.Status == EnrollmentStatus.Active, ct);
         if (count >= group.Capacity) throw new InvalidOperationException("Group capacity has been reached.");
-        var enrollment = new GroupEnrollment { GroupId = groupId, StudentId = request.StudentId, StartDate = request.StartDate, ExemptionType = request.ExemptionType,
-            ExemptionReason = request.ExemptionReason, Discount = request.Discount, MaxDebt = request.MaxDebt,
-            OutstandingBalance = request.ExemptionType == ExemptionType.Full ? 0 : Math.Max(0, group.Price - request.Discount) };
+        var enrollment = new GroupEnrollment { GroupId = groupId, StudentId = request.StudentId, StartDate = request.StartDate };
         db.GroupEnrollments.Add(enrollment); await db.SaveChangesAsync(ct);
-        await students.ApplyEnrollmentBalanceChangeAsync(request.StudentId, enrollment.OutstandingBalance, ct);
         return enrollment;
     }
 
@@ -65,34 +60,4 @@ public class GroupService(AppDbContext db, ITeacherService teachers, ICatalogLoo
          join studyGroup in db.StudyGroups.AsNoTracking() on enrollment.GroupId equals studyGroup.Id
          where studyGroup.TeacherId == teacherId && enrollment.Status == EnrollmentStatus.Active
          select enrollment.StudentId).Distinct().ToListAsync(ct);
-
-    public async Task<GroupBillingSnapshot?> GetBillingSnapshotAsync(Guid enrollmentId, Guid? sessionId = null, CancellationToken ct = default)
-    {
-        var enrollment = await db.GroupEnrollments.AsNoTracking().SingleOrDefaultAsync(x => x.Id == enrollmentId, ct);
-        if (enrollment is null) return null;
-        var group = await db.StudyGroups.AsNoTracking().SingleOrDefaultAsync(x => x.Id == enrollment.GroupId, ct);
-        if (group is null) return null;
-        var session = sessionId.HasValue ? await db.ClassSessions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == sessionId, ct) : null;
-        if (session is not null && session.GroupId != group.Id) return null;
-        return new GroupBillingSnapshot(enrollment.Id, enrollment.StudentId, group.Id, group.TeacherId, group.Price, group.PriceType,
-            enrollment.Discount, enrollment.ExemptionType, enrollment.OutstandingBalance, enrollment.MaxDebt, session?.Id ?? Guid.Empty, session?.Date ?? DateOnly.FromDateTime(DateTime.UtcNow));
-    }
-
-    public async Task<GroupBillingSnapshot?> GetCheckInSnapshotAsync(Guid studentId, Guid sessionId, CancellationToken ct = default)
-    {
-        var session = await db.ClassSessions.AsNoTracking().SingleOrDefaultAsync(x => x.Id == sessionId, ct);
-        if (session is null || session.Status is ClassSessionStatus.Cancelled or ClassSessionStatus.Postponed) return null;
-        var group = await db.StudyGroups.AsNoTracking().SingleOrDefaultAsync(x => x.Id == session.GroupId, ct);
-        var enrollment = await db.GroupEnrollments.AsNoTracking().SingleOrDefaultAsync(x => x.GroupId == session.GroupId && x.StudentId == studentId && x.Status == EnrollmentStatus.Active, ct);
-        if (group is null || enrollment is null) return null;
-        return new GroupBillingSnapshot(enrollment.Id, studentId, group.Id, group.TeacherId, group.Price, group.PriceType,
-            enrollment.Discount, enrollment.ExemptionType, enrollment.OutstandingBalance, enrollment.MaxDebt, session.Id, session.Date);
-    }
-
-    public async Task UpdateOutstandingBalanceAsync(Guid enrollmentId, decimal balance, CancellationToken ct = default)
-    {
-        var enrollment = await db.GroupEnrollments.SingleOrDefaultAsync(x => x.Id == enrollmentId, ct) ?? throw new KeyNotFoundException("Enrollment not found.");
-        enrollment.OutstandingBalance = enrollment.ExemptionType == ExemptionType.Full ? 0 : Math.Max(0, balance);
-        enrollment.UpdatedAt = DateTime.UtcNow; await db.SaveChangesAsync(ct);
-    }
 }

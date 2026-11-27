@@ -9,9 +9,8 @@ public record CreateIdentityUserRequest(
     [property: Required] string Role,
     string? Phone);
 
-public record CreateStudentRequest(Guid UserId, string? Code, decimal? MaxDebt);
-public record UpdateStudentRequest(decimal? MaxDebt);
+public record CreateStudentRequest(Guid UserId, string? Code);
 public record CreateParentRequest(Guid UserId);
 public record LinkParentRequest(Guid StudentId, Guid ParentId, string Relation, bool IsPrimary);
 public record CreateStaffRequest(Guid UserId, Guid TeacherId, string JobTitle);
-public record StudentProfileDto(Guid Id, Guid UserId, string Name, string Code, decimal OutstandingBalance, decimal? MaxDebt);
+public record StudentProfileDto(Guid Id, Guid UserId, string Name, string Code);

@@ -4,16 +4,10 @@ using LearnSpace.Api.Common.Errors;
 using LearnSpace.Api.Common.Storage;
 using LearnSpace.Api.Data;
 using LearnSpace.Api.Data.Seed;
-using LearnSpace.Api.Modules.Assessments;
 using LearnSpace.Api.Modules.Catalog;
-using LearnSpace.Api.Modules.Content;
 using LearnSpace.Api.Modules.Enrollments;
 using LearnSpace.Api.Modules.Identity;
 using LearnSpace.Api.Modules.Groups;
-using LearnSpace.Api.Modules.Attendance;
-using LearnSpace.Api.Modules.Payments;
-using LearnSpace.Api.Modules.Notifications;
-using LearnSpace.Api.Modules.Subscriptions;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Http.Features;
 using Microsoft.AspNetCore.Identity;
@@ -25,7 +19,7 @@ var builder = WebApplication.CreateBuilder(args);
 var config = builder.Configuration;
 
 // ---------------------------------------------------------------------
-// Request size: big enough for the largest upload (the 200 MB video) plus form overhead.
+// Request size: big enough for the largest upload (the teacher logo) plus form overhead.
 // ---------------------------------------------------------------------
 var largestUploadMb = config.GetSection("Storage:Uploads").GetChildren()
     .Select(c => c.GetValue<int?>("MaxMb") ?? 0)
@@ -129,7 +123,7 @@ builder.Services.AddSingleton<UploadValidator>();
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<IUserLookup, UserLookup>();
 builder.Services.AddScoped<IdentityService>();
-builder.Services.AddScoped<IStudentDebtService>(sp => sp.GetRequiredService<IdentityService>());
+builder.Services.AddScoped<IStudentDirectory>(sp => sp.GetRequiredService<IdentityService>());
 builder.Services.AddScoped<IStaffDirectory>(sp => sp.GetRequiredService<IdentityService>());
 
 // Catalog
@@ -140,28 +134,14 @@ builder.Services.AddScoped<ITeacherService>(sp => sp.GetRequiredService<TeacherS
 builder.Services.AddScoped<SubjectService>();
 builder.Services.AddScoped<ICatalogLookup>(sp => sp.GetRequiredService<SubjectService>());
 
-// Groups, payments, attendance, and notifications coordinate through module contracts.
+// Groups coordinate with other modules through module contracts.
 builder.Services.AddScoped<GroupService>();
-builder.Services.AddScoped<IGroupBillingService>(sp => sp.GetRequiredService<GroupService>());
-builder.Services.AddScoped<PaymentService>();
-builder.Services.AddScoped<IPaymentService>(sp => sp.GetRequiredService<PaymentService>());
-builder.Services.AddScoped<AttendanceService>();
-builder.Services.AddScoped<NotificationService>();
-builder.Services.AddScoped<INotificationService>(sp => sp.GetRequiredService<NotificationService>());
-builder.Services.AddScoped<TutoringAssessmentService>();
+builder.Services.AddScoped<IGroupDirectory>(sp => sp.GetRequiredService<GroupService>());
 
 // Enrollment
 builder.Services.AddScoped<EnrollmentService>();
 builder.Services.AddScoped<IEnrollmentService>(sp => sp.GetRequiredService<EnrollmentService>());
 builder.Services.AddScoped<CourseResultsService>();
-
-// Content
-builder.Services.AddScoped<MaterialService>();
-
-// Assessments
-builder.Services.AddScoped<QuizService>();
-builder.Services.AddScoped<CourseTaskService>();
-builder.Services.AddScoped<IAssessmentSummaryService, AssessmentSummaryService>();
 
 builder.Services.AddScoped<DbSeeder>();
 

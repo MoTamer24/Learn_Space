@@ -5,7 +5,7 @@ using Microsoft.EntityFrameworkCore;
 
 namespace LearnSpace.Api.Modules.Identity;
 
-public class IdentityService(AppDbContext db, UserManager<ApplicationUser> users, ITeacherService teachers) : IStudentDebtService, IStaffDirectory
+public class IdentityService(AppDbContext db, UserManager<ApplicationUser> users, ITeacherService teachers) : IStudentDirectory, IStaffDirectory
 {
     public async Task<ApplicationUser> CreateUserAsync(CreateIdentityUserRequest request, CancellationToken ct = default)
     {
@@ -32,7 +32,7 @@ public class IdentityService(AppDbContext db, UserManager<ApplicationUser> users
         if (!await users.IsInRoleAsync(user, AppRoles.Student)) throw new InvalidOperationException("The user must have the Student role.");
         if (await db.Students.AnyAsync(x => x.UserId == request.UserId || (request.Code != null && x.Code == request.Code), ct))
             throw new InvalidOperationException("A student profile or code already exists.");
-        var student = new Student { UserId = request.UserId, Code = string.IsNullOrWhiteSpace(request.Code) ? Guid.NewGuid().ToString("N")[..10].ToUpperInvariant() : request.Code.Trim(), MaxDebt = request.MaxDebt };
+        var student = new Student { UserId = request.UserId, Code = string.IsNullOrWhiteSpace(request.Code) ? Guid.NewGuid().ToString("N")[..10].ToUpperInvariant() : request.Code.Trim() };
         db.Students.Add(student);
         await db.SaveChangesAsync(ct);
         return student;
@@ -44,21 +44,13 @@ public class IdentityService(AppDbContext db, UserManager<ApplicationUser> users
          join u in db.Users.AsNoTracking() on s.UserId equals u.Id
          where !s.IsDeleted
          orderby u.DisplayName
-         select new StudentProfileDto(s.Id, s.UserId, u.DisplayName, s.Code, s.OutstandingBalance, s.MaxDebt);
+         select new StudentProfileDto(s.Id, s.UserId, u.DisplayName, s.Code);
         if (studentIds is not null) query = query.Where(x => studentIds.Contains(x.Id));
         return query.ToListAsync(ct);
     }
 
-    public async Task<StudentDebtSnapshot?> GetDebtSnapshotAsync(Guid studentId, CancellationToken cancellationToken = default)
-    {
-        var student = await db.Students.AsNoTracking().SingleOrDefaultAsync(x => x.Id == studentId && !x.IsDeleted, cancellationToken);
-        if (student is null) return null;
-        var parentUserIds = await (from link in db.StudentParents.AsNoTracking()
-                                   join parent in db.Parents.AsNoTracking() on link.ParentId equals parent.Id
-                                   where link.StudentId == studentId
-                                   select parent.UserId).Distinct().ToListAsync(cancellationToken);
-        return new StudentDebtSnapshot(student.Id, student.OutstandingBalance, student.MaxDebt, parentUserIds);
-    }
+    public Task<bool> StudentExistsAsync(Guid studentId, CancellationToken cancellationToken = default) =>
+        db.Students.AsNoTracking().AnyAsync(x => x.Id == studentId && !x.IsDeleted, cancellationToken);
 
     public Task<Guid?> GetStudentIdForUserAsync(Guid userId, CancellationToken cancellationToken = default) =>
         db.Students.Where(x => x.UserId == userId && !x.IsDeleted).Select(x => (Guid?)x.Id).SingleOrDefaultAsync(cancellationToken);
@@ -71,13 +63,4 @@ public class IdentityService(AppDbContext db, UserManager<ApplicationUser> users
 
     public Task<Guid?> GetTeacherIdForStaffUserAsync(Guid staffUserId, CancellationToken cancellationToken = default) =>
         db.Staff.Where(x => x.UserId == staffUserId).Select(x => (Guid?)x.TeacherId).SingleOrDefaultAsync(cancellationToken);
-
-    public async Task ApplyEnrollmentBalanceChangeAsync(Guid studentId, decimal delta, CancellationToken cancellationToken = default)
-    {
-        var student = await db.Students.SingleOrDefaultAsync(x => x.Id == studentId && !x.IsDeleted, cancellationToken)
-            ?? throw new KeyNotFoundException("Student profile not found.");
-        student.OutstandingBalance = Math.Max(0, student.OutstandingBalance + delta);
-        student.UpdatedAt = DateTime.UtcNow;
-        await db.SaveChangesAsync(cancellationToken);
-    }
 }

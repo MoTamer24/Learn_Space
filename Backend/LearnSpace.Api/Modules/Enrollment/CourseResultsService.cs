@@ -1,20 +1,15 @@
 using LearnSpace.Api.Data;
-using LearnSpace.Api.Modules.Assessments;
 using LearnSpace.Api.Modules.Catalog;
 using LearnSpace.Api.Modules.Identity;
 using Microsoft.EntityFrameworkCore;
 
 namespace LearnSpace.Api.Modules.Enrollments;
 
-/// <summary>
-/// Builds the teacher's results table. Lives in its own class (not EnrollmentService) so that
-/// EnrollmentService stays free of dependencies on Assessments, which itself uses IEnrollmentService.
-/// </summary>
+/// <summary>Builds the teacher's list of students enrolled in one of their courses.</summary>
 public class CourseResultsService(
     AppDbContext db,
     ICourseService courses,
-    IUserLookup users,
-    IAssessmentSummaryService summaries)
+    IUserLookup users)
 {
     public async Task<List<StudentResultRowDto>> GetAsync(Guid teacherId, Guid courseId)
     {
@@ -26,16 +21,9 @@ public class CourseResultsService(
             .ToListAsync();
 
         var names = await users.GetDisplayNamesAsync(studentIds);
-        var results = await summaries.GetForCourseAsync(courseId, studentIds);
 
         return studentIds
-            .Select(id =>
-            {
-                var s = results.GetValueOrDefault(id) ?? StudentAssessmentSummary.Empty;
-                return new StudentResultRowDto(
-                    id, names.GetValueOrDefault(id, ""),
-                    s.QuizStatus, s.QuizScore, s.TaskStatus, s.TaskIsLate, s.TaskScore);
-            })
+            .Select(id => new StudentResultRowDto(id, names.GetValueOrDefault(id, "")))
             .OrderBy(r => r.DisplayName)
             .ToList();
     }

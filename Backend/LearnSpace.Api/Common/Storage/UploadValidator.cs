@@ -5,9 +5,6 @@ namespace LearnSpace.Api.Common.Storage;
 
 public static class UploadKinds
 {
-    public const string Video = "Video";
-    public const string Document = "Document";
-    public const string TaskFile = "TaskFile";
     public const string Logo = "Logo";
 }
 
